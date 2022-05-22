@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.emos.wx.db.mapper.TbMeetingMapper">
+    <!--添加会议 -->
+    <insert id="insertMeeting" parameterType="com.example.emos.wx.db.pojo.TbMeeting">
+        INSERT INTO tb_meeting
+        SET uuid = #{uuid},
+        title = #{title},
+        date = #{date},
+        creator_id = #{creatorId},
+        <if test="place!=null">
+            place = #{place},
+        </if>
+        start = #{start},
+        end = #{end},
+        type = #{type},
+        members = #{members},
+        `desc` = #{desc},
+        instance_id = #{instanceId},
+        status = #{status},
+        create_time = NOW()
+    </insert>
+
+    <!--查询会议列表分页 -->
+    <select id="searchMyMeetingListByPage" parameterType="HashMap" resultType="HashMap">
+        SELECT
+            m.id,
+            m.uuid,
+            m.title,
+            u2.name,
+            DATE_FORMAT(m.date, '%Y年%m月%d日') AS date,
+            m.place,
+            DATE_FORMAT(m.start, '%H:%i') AS start,
+            DATE_FORMAT(m.end, '%H:%i') AS end,
+            m.type,
+            m.status,
+            m.desc,
+            u2.photo,
+
+            CAST( u2.id AS CHAR ) as u2Id, #创建人id
+
+            TIMESTAMPDIFF(HOUR, CONCAT(m.date, ' ', m.start), CONCAT(m.date, ' ', m.end)) AS hour
+        FROM
+            tb_meeting m
+                JOIN tb_user u1 ON JSON_CONTAINS(m.members , CAST(u1.id AS CHAR ))
+                JOIN tb_user u2 ON u2.id = m.creator_id
+        WHERE
+            u1.id = #{userId}
+          AND m.status IN ( 3, 4 ,5)
+          AND u1.status = 1
+          AND u2.status = 1
+        ORDER BY
+            m.date, m.start, m.id
+        LIMIT
+            #{start}, #{length}
+    </select>
+
+    <select id="searchMeetingMembersInSameDept" parameterType="String" resultType="boolean">
+        SELECT
+            IF(COUNT(DISTINCT u.dept_id)=1,TRUE,FALSE ) AS bool
+        FROM tb_meeting m
+                 JOIN tb_user u ON JSON_CONTAINS ( m.members, CAST( u.id AS CHAR ) )
+        WHERE m.uuid=#{uuid} AND u.status = 1
+    </select>
+    <update id="updateMeetingInstanceId" parameterType="HashMap">
+        UPDATE tb_meeting
+        SET instance_id=#{instanceId}
+        WHERE uuid=#{uuid}
+    </update>
+
+    <select id="searchMeetingById" parameterType="int" resultType="HashMap">
+        SELECT
+            m.uuid,
+            m.creator_id AS creatorId,
+            m.title,
+            u.name,
+            DATE_FORMAT( m.date, '%Y-%m-%d' ) AS date,
+            m.place,
+            DATE_FORMAT( m.START, '%H:%i' ) AS start,
+            DATE_FORMAT( m.END, '%H:%i' ) AS end,
+            m.type,
+            m.status,
+            m.desc,
+            m.instance_id AS instanceId
+        FROM tb_meeting m
+                 JOIN tb_user u ON m.creator_id = u.id
+        WHERE m.id =#{id} AND u.status = 1
+    </select>
+    <select id="searchMeetingMembers" parameterType="int" resultType="HashMap">
+        SELECT
+            u.id,
+            u.name,
+            u.photo
+        FROM tb_meeting m
+                 JOIN tb_user u ON JSON_CONTAINS ( m.members, CAST( u.id AS CHAR ) )
+        WHERE m.id=#{id} AND u.status = 1
+    </select>
+
+    <update id="updateMeetingInfo" parameterType="HashMap">
+        UPDATE tb_meeting
+        SET title = #{title},
+        date = #{date},
+        <if test="place!=null">
+            place = #{place},
+        </if>
+        <if test="place==null">
+            place = NULL,
+        </if>
+        start = #{start},
+        end = #{end},
+        type = #{type},
+        members = #{members},
+        `desc` = #{desc},
+        status=#{status}
+        WHERE id = #{id}
+ /*         AND status=3*/
+    </update>
+
+    <!--未用-->
+    <delete id="deleteMeetingById" parameterType="int">
+        DELETE FROM tb_meeting
+        WHERE id=#{id} AND status=3
+    </delete>
+
+    <select id="searchUserMeetingInMonth" parameterType="Map" resultType="String">
+        SELECT
+            DISTINCT DATE_FORMAT( m.date, '%Y/%m/%d' ) AS date
+        FROM tb_meeting m
+                 JOIN tb_user u ON JSON_CONTAINS ( m.members, CAST( u.id AS CHAR ) )
+        WHERE u.id = #{userId}
+          AND u.status = 1
+          AND m.status IN(3,4,5)
+          AND DATE_FORMAT(m.date,'%Y/%c')=#{express}
+    </select>
+
+
+
+
+
+
+    <!--    部门经理可以审批 那么应该在权限模型里设置一个权限-->
+    <select id="searchMeetingByManagerDept" parameterType="HashMap" resultType="HashMap">
+        SELECT
+        m.`id` as id,
+        u2.`name` as creatorId,
+        m.uuid,
+        m.approvalId,
+        m.`desc`,
+        m.members,
+        m.title,
+        m.date as date_origin,
+        DATE_FORMAT( m.date, '%Y年%m月%d日' ) AS date,
+        m.type,
+        m.status,
+        u2.photo,
+        DATE_FORMAT( m.START, '%H:%i' ) AS start,
+        DATE_FORMAT( m.END, '%H:%i' ) AS end
+
+        FROM
+        tb_user u1
+        right JOIN tb_user u2 ON u1.dept_id = u2.dept_id AND u1.id=u2.id
+        JOIN tb_meeting m ON m.creator_id = u2.id
+        WHERE 1=1
+        <if test="id!=null">
+            AND m.approvalId = #{id}
+
+        </if>
+        AND u1.LEVEL &lt;= 2
+        AND u1.STATUS = 1
+        AND u2.STATUS = 1
+        AND m.`status` IN
+
+        <foreach collection="type" item="one" separator="," open="(" close=")">
+            #{one}
+        </foreach>
+        ORDER BY m.date,m.start,m.id
+        LIMIT #{start}, #{length}
+    </select>
+    <update id="updateMeetingSuccessById" parameterType="int">
+        UPDATE tb_meeting
+        SET status= 3,approvalId=#{approvalId}
+        WHERE id = #{id}
+    </update>
+    <update id="updateMeetingFailById" parameterType="int">
+        UPDATE tb_meeting
+        SET status= 2,approvalId=#{approvalId}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateMeetingOver" parameterType="int">
+        UPDATE tb_meeting
+        SET status= 5
+        WHERE id = #{id}
+    </update>
+    <update id="updateMeetingToDelete" parameterType="int">
+        UPDATE tb_meeting
+        SET status= 6
+        WHERE id = #{id}
+    </update>
+    <update id="updateMeetingToStarting" parameterType="int">
+        UPDATE tb_meeting
+        SET status= 4
+        WHERE id = #{id}
+    </update>
+    <delete id="deleteMeetingInfo" parameterType="int">
+        delete
+        from tb_meeting
+        where id=#{id}
+    </delete>
+</mapper>
