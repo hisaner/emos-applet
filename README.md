@@ -2,3 +2,4 @@
 A modified incomplete project  
 *Modify and use Baidu face recognition  
 *Modify conference management  
+*add profile page
