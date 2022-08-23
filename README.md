@@ -1,10 +1,10 @@
-# emos-applet（在线办公微信小程序）
+# emos-applet
 A modified incomplete project  
 *Modify and use Baidu face recognition  
 *Modify conference management  
 *add profile page
 
-#emos小程序
+#emos小程序 （在线办公微信小程序）
 
 修改后的不完整项目
 
